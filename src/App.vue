@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import axios from 'axios'
-import { onMounted, ref } from 'vue'
-import { SearchOutlined, PlusOutlined } from '@ant-design/icons-vue'
+import { onMounted, reactive, ref } from 'vue'
+import { SearchOutlined, PlusOutlined, SettingOutlined } from '@ant-design/icons-vue'
 import dayjs, { Dayjs } from 'dayjs'
+import Mappper from '@lib/types/mapper'
+import { TinyEmitter } from 'tiny-emitter'
 
 type Stock = { dm: string; mc: string; jys: 'sz' | 'sh' }
 type New = { title: string; content: string; cover: string; create_time: Dayjs }
@@ -10,6 +12,16 @@ type New = { title: string; content: string; cover: string; create_time: Dayjs }
 const searchData = ref<any[]>([])
 const allStks = ref<Stock[]>([])
 const relNews = ref<New[]>([])
+const searchOpns = reactive({
+  mapper: new Mappper({
+    source: {
+      label: '来源',
+      type: 'Select',
+      options: [{ label: '韭研公社', value: 'jiuyangongshe' }]
+    }
+  }),
+  emitter: new TinyEmitter()
+})
 
 onMounted(refresh)
 
@@ -29,14 +41,27 @@ function onSearchInput(inputText: string) {
   }
 }
 async function onSearchSelect(selStk: Stock) {
-  const resp = await axios.post('https://app.jiuyangongshe.com/jystock-app/api/v2/article/search', {
-    back_garden: 0,
-    keyword: selStk.mc,
-    limit: 15,
-    order: 1,
-    start: 0,
-    type: '2'
-  })
+  if (!selStk) {
+    return
+  }
+  const resp = await axios.post(
+    'https://app.jiuyangongshe.com/jystock-app/api/v2/article/search',
+    {
+      back_garden: 0,
+      keyword: selStk.mc,
+      limit: 15,
+      order: 1,
+      start: 0,
+      type: '2'
+    },
+    {
+      headers: {
+        Token: '06ad131f2ae41908112918bdb95569f2',
+        Timestamp: 1730448127117,
+        Platform: 3
+      }
+    }
+  )
   if (resp.status !== 200) {
     throw new Error('查询股票新闻异常')
   }
@@ -49,6 +74,7 @@ async function onSearchSelect(selStk: Stock) {
   }
   console.log(relNews.value)
 }
+function onSearchSet() {}
 </script>
 
 <template>
@@ -76,6 +102,16 @@ async function onSearchSelect(selStk: Stock) {
         <a-button type="primary" size="large">
           <template #icon><PlusOutlined /></template>
         </a-button>
+        <a-button size="large" @click="() => searchOpns.emitter.emit('update:visible', true)">
+          <template #icon><SettingOutlined /></template>
+        </a-button>
+        <FormDialog
+          title="搜索配置"
+          :mapper="searchOpns.mapper"
+          :emitter="searchOpns.emitter"
+          :new-fun="() => ({ source: 'jiuyangongshe' })"
+          @submit="onSearchSet"
+        />
       </a-space>
     </a-layout-header>
     <a-layout>
@@ -85,18 +121,3 @@ async function onSearchSelect(selStk: Stock) {
     <a-layout-footer>爬取任务状态和控制</a-layout-footer>
   </a-layout>
 </template>
-
-<style scoped>
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.vue:hover {
-  filter: drop-shadow(0 0 2em #42b883aa);
-}
-</style>
